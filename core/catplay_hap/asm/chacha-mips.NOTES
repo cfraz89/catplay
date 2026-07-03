@@ -1,0 +1,23 @@
+#
+# ====================================================================
+# Written by Andy Polyakov, @dot-asm, initially for use with OpenSSL.
+# ====================================================================
+#
+# ChaCha20 for MIPS.
+#
+# March 2019.
+#
+# Even though compiler seems to generate optimal rounds loop, same as
+# ROUNDs below, it somehow screws up the outer loop...
+#
+# R1x000	15.5/?		(big-endian)
+# Octeon II	9.2(*)/+65%	(little-endian)
+#
+# (*)	aligned intput and output, result for misaligned is 10.7;
+#
+######################################################################
+# There is a number of MIPS ABI in use, O32 and N32/64 are most
+# widely used. Then there is a new contender: NUBI. It appears that if
+# one picks the latter, it's possible to arrange code in ABI neutral
+# manner. Therefore let's stick to NUBI register layout:
+#

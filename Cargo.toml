@@ -1,0 +1,59 @@
+[workspace]
+resolver = "3"
+members = [
+    "bluetooth/catplay_bt",
+    "bluetooth/catplay_iap2_bt",
+
+    "core/catplay_bonjour",
+    "core/catplay_csm",
+    "core/catplay_hap",
+    "core/catplay_iap2_link",
+    "core/catplay_mfi",
+    "core/catplay_tracing",
+    "core/catplay_tracing_macro",
+
+    "core/catplay_util",
+    "core/catplay_plist",
+
+    "c2a/catplay_c2a",
+    "c2a/catplay_fb",
+
+    "carplay/catplay_carplay",
+    "carplay/catplay_audio",
+    "carplay/catplay_hid",
+    "carplay/catplay_fairplay",
+    "carplay/catplay_ring",
+
+    "usb/catplay_iap2_usb",
+    "usb/catplay_iap2_usb_host",
+
+    "async/catplay_tokio",
+    "async/catplay_udp",
+    "async/catplay_iap2_client",
+
+
+    "catplay_carplay_rx_gadget",
+    "catplay_carplay_tx_gadget",
+
+    "usb/catplay_iap2_usb_gadget",
+    "async/catplay_async",
+    "async/catplay_async_derive",
+]
+
+[profile.release]
+opt-level = "s"   # z
+lto = true
+codegen-units = 1
+
+# [profile.release]
+# debug = 2
+# lto = false
+# codegen-units = 1
+
+
+#panic = "abort" # "unwind"
+#rustflags = [
+#    "-C", "link-args=-Wl,--verbose,--gc-sections"
+#]
+#strip = true
+#debug = false

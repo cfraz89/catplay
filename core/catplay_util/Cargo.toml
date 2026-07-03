@@ -1,0 +1,13 @@
+[package]
+name = "catplay_util"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-trait = "0.1.89"
+log = "0.4.28"
+ctor = "0.6.0"
+catplay_tracing = { path = "../catplay_tracing" }
+catplay_async = { path = "../../async/catplay_async" }
+[dev-dependencies]
+paste = "1.0.15"

@@ -1,0 +1,19 @@
+[package]
+name = "catplay_plist"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+plist = { version = "1.7.4", features = [
+    "enable_unstable_features_that_may_break_with_minor_version_bumps",
+] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_repr = "0.1.20"
+serde_with = "3.14.0"
+bitflags = { version = "2.9.1" }
+log = "0.4.29"
+bytes = "1.10.1"
+thiserror = "2.0.18"
+
+catplay_util = { path = "../catplay_util" }
+catplay_tracing = { path = "../catplay_tracing" }

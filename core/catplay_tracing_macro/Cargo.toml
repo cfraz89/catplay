@@ -1,0 +1,17 @@
+[package]
+name = "catplay_tracing_macro"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+catplay_tracing = { path = "../catplay_tracing" }
+log = { version = "0.4.29" }
+quote = "1.0.45"
+syn = { version = "2.0.117", features = ["full"] }
+
+[features]
+std = []
+default = ["std"]
+
+[lib]
+proc-macro = true

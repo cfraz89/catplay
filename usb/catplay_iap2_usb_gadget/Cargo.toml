@@ -1,0 +1,30 @@
+[package]
+name = "catplay_iap2_usb_gadget"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+usb-gadget = { version = "0.7.5", features = ["tokio"] }
+catplay_util = { path = "../../core/catplay_util" }
+catplay_iap2_client = { path = "../../async/catplay_iap2_client" }
+catplay_iap2_link = { path = "../../core/catplay_iap2_link" }
+catplay_iap2_usb = { path = "../../usb/catplay_iap2_usb" }
+
+async-trait = "0.1.89"
+log = "0.4.28"
+rusb = { version = "0.9.4", default-features = false }
+thiserror = "2.0.17"
+
+tokio = "1.48.0"
+tokio-util = { version = "0.7.15", features = ["codec"] }
+
+macaddr = "1.0.1"
+bytes = "1.10.1"
+libc = "0.2.183"
+uuid = { version = "1.16.0", default-features = false, features = [
+    "v4",
+    "rng-rand",
+] }
+
+libusb1-sys = { version = "0.7.0", default-features = false }
+futures = "0.3.31"

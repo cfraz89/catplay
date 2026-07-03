@@ -1,0 +1,105 @@
+# NOTE: this toolchain is broken; Instant::now() does not work on real device
+FROM messense/rust-musl-cross:mipsel-musl
+
+ARG RUST_TARGET=mipsel-unknown-linux-musl
+ARG MUSL_TRIPLE=mipsel-unknown-linux-musl
+ARG MUSL_BIN=/usr/local/musl/bin
+ARG OPENSSL_VERSION=3.3.1
+ARG OPENSSL_PREFIX=/usr/local/musl/${RUST_TARGET}
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV RUSTUP_TOOLCHAIN=nightly
+ENV CARGO_BUILD_TARGET=${RUST_TARGET}
+ENV CC_mipsel_unknown_linux_musl=${MUSL_BIN}/${MUSL_TRIPLE}-gcc
+ENV CXX_mipsel_unknown_linux_musl=${MUSL_BIN}/${MUSL_TRIPLE}-g++
+ENV AR_mipsel_unknown_linux_musl=${MUSL_BIN}/${MUSL_TRIPLE}-ar
+ENV CARGO_TARGET_MIPSEL_UNKNOWN_LINUX_MUSL_LINKER=${MUSL_BIN}/${MUSL_TRIPLE}-gcc
+ENV RUSTFLAGS=-Ctarget-feature=+crt-static,+fpxx
+ENV PATH=${MUSL_BIN}:/usr/local/bin:/root/.cargo/bin:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV OPENSSL_DIR=${OPENSSL_PREFIX}
+ENV OPENSSL_STATIC=1
+ENV PKG_CONFIG_ALLOW_CROSS=1
+ENV PKG_CONFIG_PATH=${OPENSSL_PREFIX}/lib/pkgconfig:${OPENSSL_PREFIX}/lib64/pkgconfig
+ENV PKG_CONFIG_LIBDIR=${OPENSSL_PREFIX}/lib/pkgconfig:${OPENSSL_PREFIX}/lib64/pkgconfig
+ENV PKG_CONFIG_SYSROOT_DIR=${OPENSSL_PREFIX}
+ENV RUST_LIBC_UNSTABLE_MUSL_V1_2_3=1
+ENV RUST_LIBC_UNSTABLE_GNU_TIME_BITS=64
+
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+  ca-certificates \
+  qemu-user-static \
+  gdb-multiarch \
+  pkg-config \
+  perl \
+  make \
+  cmake \
+  git \
+  file \
+  curl && \
+  rm -rf /var/lib/apt/lists/*
+
+RUN rustup component add rust-src --toolchain nightly
+
+RUN cd /tmp && \
+  curl -fsSLO https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz && \
+  tar -xzf openssl-${OPENSSL_VERSION}.tar.gz && \
+  cd openssl-${OPENSSL_VERSION} && \
+  CC="${MUSL_BIN}/${MUSL_TRIPLE}-gcc" \
+  AR="${MUSL_BIN}/${MUSL_TRIPLE}-ar" \
+  RANLIB="${MUSL_BIN}/${MUSL_TRIPLE}-ranlib" \
+  ./Configure linux-mips32 \
+  no-shared \
+  no-tests \
+  no-dso \
+  no-engine \
+  --prefix="${OPENSSL_PREFIX}" \
+  --openssldir="${OPENSSL_PREFIX}" && \
+  make -j"$(nproc)" && \
+  make install_sw && \
+  rm -rf /tmp/openssl-${OPENSSL_VERSION} /tmp/openssl-${OPENSSL_VERSION}.tar.gz
+
+RUN printf '%s\n' \
+  '#!/bin/sh' \
+  'set -eu' \
+  'export QEMU_RESERVED_VA="${QEMU_RESERVED_VA:-0x80000000}"' \
+  'export RUST_TEST_THREADS="${RUST_TEST_THREADS:-1}"' \
+  'export RUST_MIN_STACK="${RUST_MIN_STACK:-524288}"' \
+  'exec qemu-mipsel-static "$@"' \
+  > /usr/local/bin/qemu-mipsel-musl-run && \
+  chmod +x /usr/local/bin/qemu-mipsel-musl-run
+
+RUN printf '%s\n' \
+  '#!/bin/sh' \
+  'set -eu' \
+  '' \
+  'TOOLCHAIN="${RUSTUP_TOOLCHAIN:-nightly}"' \
+  'REAL_CARGO="$(rustup which --toolchain "$TOOLCHAIN" cargo)"' \
+  '' \
+  'case "${1:-}" in' \
+  '  build|check|run|test|bench|doc|rustc)' \
+  '    exec "$REAL_CARGO" -Zbuild-std=std,panic_unwind,test "$@"' \
+  '    ;;' \
+  '  *)' \
+  '    exec "$REAL_CARGO" "$@"' \
+  '    ;;' \
+  'esac' \
+  > /usr/local/bin/cargo && \
+  chmod +x /usr/local/bin/cargo
+
+RUN mkdir -p /root/.cargo && \
+  printf '%s\n' \
+  '[build]' \
+  "target = \"${RUST_TARGET}\"" \
+  '' \
+  '[unstable]' \
+  'build-std = ["std", "panic_unwind", "test"]' \
+  '' \
+  "[target.${RUST_TARGET}]" \
+  "linker = \"${MUSL_BIN}/${MUSL_TRIPLE}-gcc\"" \
+  "runner = [\"qemu-mipsel-musl-run\"]" \
+  > /root/.cargo/config.toml
+
+WORKDIR /work
+
+CMD ["cargo", "test"]

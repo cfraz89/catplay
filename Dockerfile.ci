@@ -1,0 +1,44 @@
+FROM rust:1.92
+
+ENV CARGO_HOME=/usr/local/cargo
+ENV PATH=/usr/local/cargo/bin:${PATH}
+ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/local/lib64/pkgconfig:/usr/local/lib/x86_64-linux-gnu/pkgconfig
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    ca-certificates \
+    cmake \
+    curl \
+    nasm \
+    pkg-config \
+    libopus-dev \
+    libsdl2-dev \
+    libavcodec-dev \
+    libavformat-dev \
+    libavfilter-dev \
+    libavutil-dev \
+    libswscale-dev \
+    libswresample-dev \
+    libavdevice-dev \
+    ffmpeg \
+    libssl-dev \
+    libdbus-1-dev \
+    libusb-dev \
+    libasound2-dev \
+    clang \
+    libx264-dev \
+    libyuv-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://downloads.sourceforge.net/libjpeg-turbo/libjpeg-turbo-3.0.1.tar.gz -o /tmp/libjpeg-turbo.tar.gz \
+    && tar -xzf /tmp/libjpeg-turbo.tar.gz -C /tmp \
+    && cmake -S /tmp/libjpeg-turbo-3.0.1 -B /tmp/libjpeg-turbo-build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DENABLE_SHARED=ON \
+        -DENABLE_STATIC=OFF \
+    && cmake --build /tmp/libjpeg-turbo-build --parallel \
+    && cmake --install /tmp/libjpeg-turbo-build \
+    && rm -rf /tmp/libjpeg-turbo.tar.gz /tmp/libjpeg-turbo-3.0.1 /tmp/libjpeg-turbo-build
+
+RUN cargo install cargo-nextest --locked --root /usr/local/cargo

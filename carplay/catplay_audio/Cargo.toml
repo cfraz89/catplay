@@ -1,0 +1,15 @@
+[package]
+name = "catplay_audio"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+catplay_ring = { path = "../catplay_ring" }
+
+bitflags = { version = "2.9.1" }
+log = "0.4.27"
+thiserror = "2.0.14"
+
+opus2 = "0.3.3"
+fdk-aac = "0.8.0"
+alac = "0.5.0"

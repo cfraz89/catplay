@@ -1,0 +1,63 @@
+[package]
+name = "catplay_carplay"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+# CatPlay
+catplay_mfi = { path = "../../core/catplay_mfi" }
+catplay_hap = { path = "../../core/catplay_hap" }
+catplay_csm = { path = "../../core/catplay_csm" }
+catplay_bonjour = { path = "../../core/catplay_bonjour" }
+catplay_util = { path = "../../core/catplay_util" }
+catplay_tracing = { path = "../../core/catplay_tracing" }
+catplay_plist = { path = "../../core/catplay_plist" }
+catplay_ring = { path = "../catplay_ring" }
+catplay_audio = { path = "../catplay_audio" }
+
+catplay_tokio = { path = "../../async/catplay_tokio" }
+catplay_iap2_client = { path = "../../async/catplay_iap2_client" }
+
+catplay_fairplay = { path = "../../carplay/catplay_fairplay" }
+
+# Plist
+serde = { version = "1.0.219", features = ["derive"] }
+bitflags = { version = "2.9.1" }
+
+# HomeKit
+uuid = { version = "1.16.0", default-features = false, features = [
+    "v4",
+    "rng-rand",
+] }
+
+# Async
+tokio = { version = "1.48.0", features = [
+    "io-util",
+    "macros",
+    "sync",
+    "time",
+    "rt",
+    "net",
+] }
+futures = "0.3.31"
+async-trait = "0.1.89"
+bytes = "1.10.1"
+
+# Others
+libc = "0.2.183"
+log = "0.4.27"
+thiserror = "2.0.14"
+exp-golomb = "0.1.0"
+macaddr = "1.0.1"
+rand = "0.9.2"
+
+[dev-dependencies]
+mockall = "0.13.1"
+serde_json = "1.0"
+
+[features]
+tx = []
+bonjour = []
+tracing = []
+default = ["tx", "bonjour", "tracing"]

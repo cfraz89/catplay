@@ -1,0 +1,29 @@
+[package]
+name = "catplay_iap2_link"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+catplay_tracing = { path = "../catplay_tracing", optional = true }
+catplay_util = { path = "../catplay_util" }
+catplay_csm = { path = "../catplay_csm", optional = true }
+
+bitflags = "2.10.0"
+bytes = "1.10.1"
+log = "0.4.28"
+thiserror = "2.0.17"
+libc = { version = "0.2.180", optional = true }
+
+[features]
+std = []
+csm_parser = ["dep:catplay_csm"]
+tracing = ["std", "dep:catplay_tracing"]
+default = ["std", "csm_parser", "tracing"]
+
+[dev-dependencies]
+ctor = "0.6.0"
+criterion = { version = "0.8.1", default-features = false, features = ["cargo_bench_support"] }
+
+[[bench]]
+name = "iap2_gen_checksum"
+harness = false

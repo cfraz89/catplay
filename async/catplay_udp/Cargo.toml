@@ -1,0 +1,28 @@
+[package]
+name = "catplay_udp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+catplay_util = { path = "../../core/catplay_util" }
+catplay_tracing = { path = "../../core/catplay_tracing" }
+
+tokio = { version = "1.48.0", features = [
+    "io-util",
+    "macros",
+    "sync",
+    "time",
+    "rt",
+    "net",
+] }
+tokio-util = { version = "0.7.16", features = ["codec", "rt"] }
+
+libc = "0.2.183"
+log = "0.4.28"
+async-trait = "0.1.89"
+bytes = "1.10.1"
+futures = "0.3.31"
+thiserror = "2.0.17"
+
+[dev-dependencies]
+mockall = "0.14.0"

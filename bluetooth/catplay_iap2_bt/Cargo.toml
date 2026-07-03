@@ -1,0 +1,20 @@
+[package]
+name = "catplay_iap2_bt"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+catplay_tracing = { path = "../../core/catplay_tracing" }
+catplay_util = { path = "../../core/catplay_util" }
+catplay_iap2_link = { path = "../../core/catplay_iap2_link" }
+catplay_csm = { path = "../../core/catplay_csm" }
+catplay_mfi = { path = "../../core/catplay_mfi" }
+
+catplay_iap2_client = { path = "../../async/catplay_iap2_client" }
+catplay_bt = { path = "../../bluetooth/catplay_bt" }
+
+tokio = { version = "1.48.0", features = ["rt", "macros", "time", "io-util"] }
+log = "0.4.27"
+thiserror = "2.0.17"
+macaddr = "1.0.1"
+futures = { version = "0.3.31" }

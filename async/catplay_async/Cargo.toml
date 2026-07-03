@@ -1,0 +1,20 @@
+[package]
+name = "catplay_async"
+description = "Runtime-agnostic async dispatch and utilities"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.48.0", features = [
+    "io-util",
+    "macros",
+    "sync",
+    "time",
+    "rt",
+    "net",
+] }
+tokio-util = { version = "0.7.16", features = ["codec", "rt"] }
+futures = "0.3.31"
+async-trait = "0.1.89"
+catplay_async_derive = { path = "../catplay_async_derive" }
+libc = "0.2.183"

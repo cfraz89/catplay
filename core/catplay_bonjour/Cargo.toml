@@ -1,0 +1,23 @@
+[package]
+name = "catplay_bonjour"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-trait = "0.1.89"
+log = "0.4.28"
+tokio = { version = "1.48.0", features = [
+    "io-util",
+    "net",
+    "macros",
+    "sync",
+    "time",
+    "rt",
+] }
+if-addrs = "0.14.0"
+tokio-util = { version = "0.7.16", features = ["rt"] }
+libc = "0.2.183"
+socket2 = "0.6.1"
+
+[dev-dependencies]
+catplay_tracing = { path = "../catplay_tracing" }

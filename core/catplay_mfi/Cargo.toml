@@ -1,0 +1,10 @@
+[package]
+name = "catplay_mfi"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libc = "0.2.186"
+log = "0.4.27"
+socket2 = "0.6.1"
+thiserror = "2.0.12"

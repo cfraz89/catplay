@@ -1,0 +1,76 @@
+FROM rustlang/rust:nightly-bookworm
+
+ARG DEB_ARCH=mipsel
+ARG GNU_TRIPLE=mipsel-linux-gnu
+ARG RUST_TARGET=mipsel-unknown-linux-gnu
+ARG QEMU_BIN=qemu-mipsel-static
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV RUSTUP_TOOLCHAIN=nightly
+ENV PKG_CONFIG_ALLOW_CROSS=1
+ENV PKG_CONFIG_LIBDIR=/usr/lib/${GNU_TRIPLE}/pkgconfig:/usr/share/pkgconfig
+ENV QEMU_LD_PREFIX=/usr/${GNU_TRIPLE}
+ENV CARGO_BUILD_TARGET=${RUST_TARGET}
+ENV CC_mipsel_unknown_linux_gnu=${GNU_TRIPLE}-gcc
+ENV CXX_mipsel_unknown_linux_gnu=${GNU_TRIPLE}-g++
+ENV AR_mipsel_unknown_linux_gnu=${GNU_TRIPLE}-ar
+ENV CARGO_TARGET_MIPSEL_UNKNOWN_LINUX_GNU_LINKER=${GNU_TRIPLE}-gcc
+ENV PATH=/usr/local/bin:/root/.cargo/bin:/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+RUN dpkg --add-architecture ${DEB_ARCH} && \
+  printf '%s\n' \
+  'deb http://deb.debian.org/debian bookworm-backports main' \
+  > /etc/apt/sources.list.d/bookworm-backports.list && \
+  apt-get update && \
+  apt-get install -y --no-install-recommends \
+  ca-certificates \
+  gcc-${GNU_TRIPLE} \
+  g++-${GNU_TRIPLE} \
+  libc6-dev-${DEB_ARCH}-cross \
+  linux-libc-dev-${DEB_ARCH}-cross \
+  libstdc++-12-dev-${DEB_ARCH}-cross \
+  qemu-user-static/bookworm-backports \
+  gdb-multiarch \
+  pkg-config \
+  libssl-dev:${DEB_ARCH} \
+  zlib1g-dev:${DEB_ARCH} \
+  perl \
+  make \
+  cmake \
+  git && \
+  rm -rf /var/lib/apt/lists/*
+
+RUN rustup component add rust-src
+
+RUN printf '%s\n' \
+  '#!/bin/sh' \
+  'set -eu' \
+  '' \
+  'TOOLCHAIN="${RUSTUP_TOOLCHAIN:-nightly}"' \
+  'REAL_CARGO="$(rustup which --toolchain "$TOOLCHAIN" cargo)"' \
+  '' \
+  'case "${1:-}" in' \
+  '  build|check|run|test|bench|doc|rustc)' \
+  '    exec "$REAL_CARGO" -Zbuild-std=std,panic_unwind,test "$@"' \
+  '    ;;' \
+  '  *)' \
+  '    exec "$REAL_CARGO" "$@"' \
+  '    ;;' \
+  'esac' \
+  > /usr/local/bin/cargo && \
+  chmod +x /usr/local/bin/cargo
+
+RUN mkdir -p /root/.cargo && \
+  printf '%s\n' \
+  '[build]' \
+  "target = \"${RUST_TARGET}\"" \
+  '' \
+  '[unstable]' \
+  'build-std = ["std", "panic_unwind", "test"]' \
+  '' \
+  "[target.${RUST_TARGET}]" \
+  "linker = \"${GNU_TRIPLE}-gcc\"" \
+  "runner = [\"${QEMU_BIN}\", \"-L\", \"/usr/${GNU_TRIPLE}\"]" \
+  > /root/.cargo/config.toml
+
+WORKDIR /work/

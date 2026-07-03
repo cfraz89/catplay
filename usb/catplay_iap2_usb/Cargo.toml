@@ -1,0 +1,24 @@
+[package]
+name = "catplay_iap2_usb"
+version = "0.1.0"
+edition = "2024"
+description = "USB gadgets core"
+
+[dependencies]
+catplay_util = { path = "../../core/catplay_util" }
+catplay_iap2_client = { path = "../../async/catplay_iap2_client" }
+catplay_iap2_link = { path = "../../core/catplay_iap2_link" }
+
+async-trait = "0.1.89"
+log = "0.4.28"
+rusb = { version = "0.9.4", default-features = false }
+thiserror = "2.0.17"
+
+tokio = "1.48.0"
+
+macaddr = "1.0.1"
+bytes = "1.10.1"
+libc = "0.2.183"
+
+libusb1-sys = { version = "0.7.0", default-features = false }
+futures = "0.3.31"

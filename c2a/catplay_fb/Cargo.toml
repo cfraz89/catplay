@@ -1,0 +1,36 @@
+[package]
+name = "catplay_fb"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+catplay_tracing = { path = "../../core/catplay_tracing" }
+catplay_tracing_macro = { path = "../../core/catplay_tracing_macro" }
+
+ab_glyph = { version = "0.2.32", default-features = false, features = ["std"] }
+image = { version = "0.25.9", default-features = false, features = ["png"] }
+pixman = { version = "0.2.1", features = ["sync"] }
+
+log = "0.4.29"
+bytes = "1.11.0"
+crc32fast = { version = "1.5.0", default-features = false }
+libc = "0.2.183"
+thiserror = "2.0.18"
+
+yuv = "0.8.9"
+x264-sys = { version = "0.2.3", optional = true }
+openh264 = { version = "0.9.3", optional = true }
+openh264-sys2 = { version = "0.9.3", optional = true }
+turbojpeg = { version = "1.4.0", default-features = false, features = [
+    "pkg-config",
+] }
+
+[features]
+libyuv = []
+prefer_libyuv = ["libyuv"]
+prefer_openh264 = ["openh264"]
+
+x264 = ["dep:x264-sys"]
+openh264 = ["dep:openh264", "dep:openh264-sys2"]
+
+default = ["libyuv", "prefer_libyuv", "x264"] # openh264

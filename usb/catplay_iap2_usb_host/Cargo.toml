@@ -1,0 +1,34 @@
+[package]
+name = "catplay_iap2_usb_host"
+version = "0.1.0"
+edition = "2024"
+
+description = "iPhone role-switch gadget and CarPlay client"
+
+[dependencies]
+catplay_util = { path = "../../core/catplay_util" }
+catplay_tracing = { path = "../../core/catplay_tracing" }
+catplay_csm = { path = "../../core/catplay_csm" }
+catplay_iap2_client = { path = "../../async/catplay_iap2_client" }
+catplay_iap2_usb = { path = "../../usb/catplay_iap2_usb" }
+
+catplay_iap2_link = { path = "../../core/catplay_iap2_link" }
+
+async-trait = "0.1.89"
+log = "0.4.28"
+thiserror = "2.0.17"
+
+tokio = { version = "1.48.0", features = ["fs", "net"] }
+
+macaddr = "1.0.1"
+bytes = "1.10.1"
+uuid = { version = "1.16.0", default-features = false, features = [
+    "v4",
+    "rng-rand",
+] }
+futures = "0.3.31"
+libc = "0.2.183"
+
+[dev-dependencies]
+ctor = "0.6.0"
+catplay_iap2_usb_gadget = { path = "../../usb/catplay_iap2_usb_gadget" }

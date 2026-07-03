@@ -1,0 +1,16 @@
+[package]
+name = "catplay_csm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+inventory = { version = "0.3.21", optional = true }
+
+[dev-dependencies]
+insta = "1.44.3"
+
+[features]
+inventory = ["dep:inventory"]
+alloc = []
+std = []
+default = ["std", "alloc", "inventory"]
