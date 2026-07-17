@@ -8,11 +8,11 @@ impl AirPlayReceiver {
         // --- Main Audio - Compatibility ---
         r.audio_formats.push(AudioFormatStruct {
             audio_input_formats: Some(AudioFormat::PCM_8000_MONO | AudioFormat::PCM_16000_MONO | AudioFormat::PCM_24000_MONO),
-            audio_output_formats: AudioFormat::PCM_8000_MONO
+            audio_output_formats: Some(AudioFormat::PCM_8000_MONO
                 | AudioFormat::PCM_16000_MONO
                 | AudioFormat::PCM_24000_MONO
                 | AudioFormat::PCM_44100_STEREO
-                | AudioFormat::PCM_48000_STEREO,
+                | AudioFormat::PCM_48000_STEREO),
             stream_type: StreamType::MainAudio,
             audio_type: Some(AudioType::Compatibility),
         });
@@ -20,7 +20,7 @@ impl AirPlayReceiver {
         // --- Alt Audio - Compatibility ---
         r.audio_formats.push(AudioFormatStruct {
             audio_input_formats: None,
-            audio_output_formats: AudioFormat::PCM_44100_STEREO | AudioFormat::PCM_48000_STEREO,
+            audio_output_formats: Some(AudioFormat::PCM_44100_STEREO | AudioFormat::PCM_48000_STEREO),
             stream_type: StreamType::AltAudio,
             audio_type: Some(AudioType::Compatibility),
         });
@@ -28,7 +28,7 @@ impl AirPlayReceiver {
         // --- Main Audio - Alert ---
         r.audio_formats.push(AudioFormatStruct {
             audio_input_formats: None,
-            audio_output_formats: AudioFormat::PCM_44100_STEREO | AudioFormat::PCM_48000_STEREO | AudioFormat::OPUS_48000_MONO,
+            audio_output_formats: Some(AudioFormat::PCM_44100_STEREO | AudioFormat::PCM_48000_STEREO | AudioFormat::OPUS_48000_MONO),
             stream_type: StreamType::MainAudio,
             audio_type: Some(AudioType::Alert),
         });
@@ -38,10 +38,10 @@ impl AirPlayReceiver {
             audio_input_formats: Some(
                 AudioFormat::PCM_24000_MONO | AudioFormat::PCM_16000_MONO | AudioFormat::OPUS_24000_MONO | AudioFormat::OPUS_16000_MONO,
             ),
-            audio_output_formats: AudioFormat::PCM_24000_MONO
+            audio_output_formats: Some(AudioFormat::PCM_24000_MONO
                 | AudioFormat::PCM_16000_MONO
                 | AudioFormat::OPUS_24000_MONO
-                | AudioFormat::OPUS_16000_MONO,
+                | AudioFormat::OPUS_16000_MONO),
             stream_type: StreamType::MainAudio,
             audio_type: Some(AudioType::Default),
         });
@@ -49,7 +49,7 @@ impl AirPlayReceiver {
         // --- Main Audio - Media ---
         r.audio_formats.push(AudioFormatStruct {
             audio_input_formats: None,
-            audio_output_formats: AudioFormat::PCM_44100_STEREO | AudioFormat::PCM_48000_STEREO,
+            audio_output_formats: Some(AudioFormat::PCM_44100_STEREO | AudioFormat::PCM_48000_STEREO),
             stream_type: StreamType::MainAudio,
             audio_type: Some(AudioType::Media),
         });
@@ -63,12 +63,11 @@ impl AirPlayReceiver {
                     | AudioFormat::OPUS_16000_MONO
                     | AudioFormat::OPUS_24000_MONO,
             ),
-            audio_output_formats: AudioFormat::PCM_16000_MONO
+            audio_output_formats: Some(AudioFormat::PCM_16000_MONO
                 | AudioFormat::PCM_24000_MONO
                 | AudioFormat::PCM_32000_MONO
                 | AudioFormat::OPUS_16000_MONO
-                | AudioFormat::OPUS_24000_MONO,
-
+                | AudioFormat::OPUS_24000_MONO),
             stream_type: StreamType::MainAudio,
             audio_type: Some(AudioType::Telephony),
         });
@@ -76,7 +75,7 @@ impl AirPlayReceiver {
         // --- Main Audio - SpeechRecognition (Siri) ---
         r.audio_formats.push(AudioFormatStruct {
             audio_input_formats: Some(AudioFormat::PCM_24000_MONO | AudioFormat::OPUS_24000_MONO),
-            audio_output_formats: AudioFormat::PCM_24000_MONO | AudioFormat::OPUS_24000_MONO,
+            audio_output_formats: Some(AudioFormat::PCM_24000_MONO | AudioFormat::OPUS_24000_MONO),
             stream_type: StreamType::MainAudio,
             audio_type: Some(AudioType::SpeechRecognition),
         });
@@ -84,7 +83,7 @@ impl AirPlayReceiver {
         // --- Alt Audio - Default ---
         r.audio_formats.push(AudioFormatStruct {
             audio_input_formats: None,
-            audio_output_formats: AudioFormat::PCM_44100_STEREO | AudioFormat::PCM_48000_STEREO | AudioFormat::OPUS_48000_MONO,
+            audio_output_formats: Some(AudioFormat::PCM_44100_STEREO | AudioFormat::PCM_48000_STEREO | AudioFormat::OPUS_48000_MONO),
             stream_type: StreamType::AltAudio,
             audio_type: Some(AudioType::Default),
         });
@@ -92,7 +91,7 @@ impl AirPlayReceiver {
         // --- Main High Audio - Media ---
         r.audio_formats.push(AudioFormatStruct {
             audio_input_formats: None,
-            audio_output_formats: AudioFormat::AAC_LC_48000_STEREO | AudioFormat::AAC_LC_44100_STEREO,
+            audio_output_formats: Some(AudioFormat::AAC_LC_48000_STEREO | AudioFormat::AAC_LC_44100_STEREO),
             stream_type: StreamType::MainHighAudio,
             audio_type: Some(AudioType::Media),
         });

@@ -49,7 +49,7 @@ plist_struct! {
         #[serde(rename = "limitedUIElements", default)]
         pub limited_ui_elements: Vec<LimitedUIElement>,
         #[serde(rename = "limitedUI")]
-        pub limited_ui: FlexBool,
+        pub limited_ui: Option<FlexBool>,
         pub manufacturer: String,
         pub model: String,
         pub modes: ChangeModes,
@@ -60,12 +60,12 @@ plist_struct! {
         #[serde(default)]
         pub oem_icons: Vec<OemIcon>,
         pub oem_icon_label: Option<String>,
-        pub oem_icon_visible: FlexBool,
+        pub oem_icon_visible: Option<FlexBool>,
         #[serde(rename = "OSInfo")]
         pub os_info: Option<String>,
         /// 1.0
         pub protocol_version: Option<String>,
-        pub right_hand_drive: FlexBool,
+        pub right_hand_drive: Option<FlexBool>,
         /// SDK version
         pub source_version: String,
 
@@ -89,7 +89,7 @@ plist_struct! {
 plist_struct! {
     pub struct AudioFormatStruct {
         pub audio_input_formats: Option<AudioFormat>,
-        pub audio_output_formats: AudioFormat,
+        pub audio_output_formats: Option<AudioFormat>,
         #[serde(rename = "type")]
         pub stream_type: StreamType,
         /// Absent in v210.81
