@@ -48,7 +48,7 @@ plist_struct! {
         pub keep_alive_send_stats_as_body: bool,
         #[serde(rename = "limitedUIElements", default)]
         pub limited_ui_elements: Vec<LimitedUIElement>,
-        #[serde(rename = "limitedUI")]
+        #[serde(rename = "limitedUI", default)]
         pub limited_ui: FlexBool,
         pub manufacturer: String,
         pub model: String,
