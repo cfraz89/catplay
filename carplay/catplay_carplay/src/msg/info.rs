@@ -60,11 +60,13 @@ plist_struct! {
         #[serde(default)]
         pub oem_icons: Vec<OemIcon>,
         pub oem_icon_label: Option<String>,
+        #[serde(default)]
         pub oem_icon_visible: FlexBool,
         #[serde(rename = "OSInfo")]
         pub os_info: Option<String>,
         /// 1.0
         pub protocol_version: Option<String>,
+        #[serde(default)]
         pub right_hand_drive: FlexBool,
         /// SDK version
         pub source_version: String,
