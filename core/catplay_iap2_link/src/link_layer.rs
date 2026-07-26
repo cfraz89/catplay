@@ -707,7 +707,8 @@ impl LinkLayer {
     fn on_recv_neg(&mut self, packet: &Packet) {
         let ctl = &packet.header.control;
         let header = &packet.header;
-        if self.status != LinkStatus::Negotiating || header.session_id != LSPPayload::SESSION_ID_CONTROL {
+        // Don't enforce SID=0 here; cars violating this spotted in the wild
+        if self.status != LinkStatus::Negotiating /*|| header.session_id != LSPPayload::SESSION_ID_CONTROL*/ {
             return;
         }
 

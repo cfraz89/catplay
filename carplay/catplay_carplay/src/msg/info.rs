@@ -48,8 +48,8 @@ plist_struct! {
         pub keep_alive_send_stats_as_body: bool,
         #[serde(rename = "limitedUIElements", default)]
         pub limited_ui_elements: Vec<LimitedUIElement>,
-        #[serde(rename = "limitedUI")]
-        pub limited_ui: Option<FlexBool>,
+        #[serde(rename = "limitedUI", default)]
+        pub limited_ui: FlexBool,
         pub manufacturer: String,
         pub model: String,
         pub modes: ChangeModes,
@@ -60,12 +60,14 @@ plist_struct! {
         #[serde(default)]
         pub oem_icons: Vec<OemIcon>,
         pub oem_icon_label: Option<String>,
-        pub oem_icon_visible: Option<FlexBool>,
+        #[serde(default)]
+        pub oem_icon_visible: FlexBool,
         #[serde(rename = "OSInfo")]
         pub os_info: Option<String>,
         /// 1.0
         pub protocol_version: Option<String>,
-        pub right_hand_drive: Option<FlexBool>,
+        #[serde(default)]
+        pub right_hand_drive: FlexBool,
         /// SDK version
         pub source_version: String,
 
