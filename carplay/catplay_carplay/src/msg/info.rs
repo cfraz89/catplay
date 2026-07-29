@@ -91,7 +91,7 @@ plist_struct! {
 plist_struct! {
     pub struct AudioFormatStruct {
         pub audio_input_formats: Option<AudioFormat>,
-        pub audio_output_formats: AudioFormat,
+        pub audio_output_formats: Option<AudioFormat>,
         #[serde(rename = "type")]
         pub stream_type: StreamType,
         /// Absent in v210.81
