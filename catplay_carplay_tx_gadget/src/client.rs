@@ -83,6 +83,9 @@ impl CarPlayUsbClientGadget {
             peer_ip,
             controller_features: vec![],
             remote_homekit_id: invite.data.pi,
+            device_id: "ff:ee:dd:cc:bb:aa".into(),
+            mac_address: "aa:bb:cc:dd:ee:ff".into(),
+            pair_verify_first: false,
         };
 
         self.pending_connect.replace(LazyAsync::new(move || AirPlayTransmitterProxy::connect(bootstrap)));

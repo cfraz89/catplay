@@ -51,6 +51,10 @@ pub struct AirPlayTransmitterBootstrapSession {
     /// Modern features
     controller_features: Vec<ControllerFeature>,
 
+    device_id: String,
+    mac_address: String,
+    pair_verify_first: bool,
+
     shared_secret: Option<[u8; 32]>,
     aes_key: Option<[u8; 16]>,
     aes_key_encrypted: Option<[u8; 16]>,
@@ -224,6 +228,9 @@ impl AirPlayTransmitterBootstrapSession {
             bootstrap.remote_homekit_id,
             result_tx,
             bootstrap.controller_features,
+            bootstrap.device_id,
+            bootstrap.mac_address,
+            bootstrap.pair_verify_first,
         ));
         let helper = TcpHelper::connect_timeout(bootstrap.peer_ip, Self::TCP_CONN_TIMEOUT_RTSP, session)
             // Failed to initialize FDs
@@ -247,6 +254,9 @@ impl AirPlayTransmitterBootstrapSession {
         remote_uuid: Option<Uuid>,
         result_tx: BootstrapResultSender,
         controller_features: Vec<ControllerFeature>,
+        device_id: String,
+        mac_address: String,
+        pair_verify_first: bool,
     ) -> Self {
         let _features = [
             ControllerFeature::UiContext,
@@ -280,6 +290,9 @@ impl AirPlayTransmitterBootstrapSession {
             setup_task: Default::default(),
             auth_setup_task: Default::default(),
             controller_features,
+            device_id,
+            mac_address,
+            pair_verify_first,
 
             // Mercedes advertises HK_PAIRING_AND_ENCRYPT, but stores identity in RAM and it's lost when you exit the car.
             // Try to bypass /pair-setup when possible for faster connection.
@@ -349,6 +362,8 @@ impl AirPlayTransmitterBootstrapSession {
         aes_iv: Option<[u8; 16]>,
 
         controller_features: Vec<ControllerFeature>,
+        device_id: String,
+        mac_address: String,
     ) -> AirPlayTransmitterBootstrapResult<AirPlayTransmitterBootstrapStreams> {
         let mut streams = AirPlayTransmitterBootstrapStreams::default();
 
@@ -369,9 +384,9 @@ impl AirPlayTransmitterBootstrapSession {
         // It doesn't hurt to attempt crypto downgrade to None, since we only transmit over USB and want to save some CPU.
 
         let mut req = InitialSetup {
-            device_id: "ff:ee:dd:cc:bb:aa".into(),
+            device_id,
             features: controller_features.clone(),
-            mac_address: "aa:bb:cc:dd:ee:ff".into(),
+            mac_address,
             model: AIRPLAY_TX_IOS_MODEL.into(),
             name: "iPhone".into(),
             os_name: Some("iPhone OS".into()),
@@ -497,6 +512,8 @@ impl AirPlayTransmitterBootstrapSession {
             self.aes_key_encrypted,
             self.aes_iv,
             self.controller_features.clone(),
+            self.device_id.clone(),
+            self.mac_address.clone(),
         );
         self.setup_task.reset(move || task);
     }
@@ -520,9 +537,12 @@ impl EventSink<RtspTransmitterEvent, ()> for AirPlayTransmitterBootstrapSession 
             RtspTransmitterEvent::SetPeerIp(ip) => self.peer_ip = ip,
             RtspTransmitterEvent::Connected => {
                 debug!("Connected - starting pairing flow");
-                self.start_setup_task();
+                if self.pair_verify_first {
+                    self.start_pair_task();
+                } else {
+                    self.start_setup_task();
+                }
                 // self.start_auth_setup_task();
-                // self.start_pair_task();
             }
             RtspTransmitterEvent::Encrypted { shared_secret } => {
                 debug!("Paired - starting SETUP/info flow");
