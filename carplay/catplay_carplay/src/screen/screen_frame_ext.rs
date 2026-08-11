@@ -147,10 +147,14 @@ impl ScreenFrame {
         let header = &mut frame.header;
         header.opcode = ScreenOpCode::VideoConfig;
         header.params[1] = Value64::from_f32_floor(avcc.width, avcc.height);
-        header.small_param[1] |= ScreenFlag::Encrypted.bits();
+
+        // What an iPhone sets, less the ones that depend on the caller. `Bit4` and `NoDisplaySleep`
+        // are copied from its config frame rather than reasoned about - a receiver that keeps the
+        // panel asleep shows exactly the black screen we were chasing.
+        let mut flags = ScreenFlag::Encrypted | ScreenFlag::Bit4 | ScreenFlag::NoDisplaySleep;
 
         if avcc.respect_timestamps {
-            header.small_param[1] |= ScreenFlag::RespectTimestamps.bits();
+            flags |= ScreenFlag::RespectTimestamps;
         }
 
         // An iPhone fills both pairs with the same rect, so mirror that rather than guessing which
@@ -166,7 +170,7 @@ impl ScreenFrame {
 
         if avcc.hevc {
             if let Some(hvcc) = hvcc_config_serialize(&avcc.avcc) {
-                header.small_param[1] |= ScreenFlag::UseFormatDescription.bits();
+                flags |= ScreenFlag::UseFormatDescription;
                 let stsd = hvcc_write_stsd_atom_from_old_format_with_tags(avcc.width, avcc.height, &hvcc, *b"hvc1", *b"hvcC");
                 frame.data.extend_from_slice(&stsd);
             }
@@ -175,11 +179,12 @@ impl ScreenFrame {
             frame.data.extend_from_slice(&data);
         }
 
+        frame.header.set_flags(flags);
         frame
     }
 
     pub fn flags(&self) -> ScreenFlag {
-        ScreenFlag::from_bits_truncate(self.header.small_param[1])
+        self.header.flags()
     }
 
     pub fn config_decode(&self, video_latency: Duration) -> Option<AvccConfigExtended> {
@@ -234,5 +239,65 @@ impl ScreenFrame {
         let header = &mut frame.header;
         header.opcode = ScreenOpCode::KeepAlive;
         frame
+    }
+}
+
+#[cfg(test)]
+mod reference_tests {
+    use super::*;
+    use crate::video::{AvccConfig, VideoView};
+
+    /// The header and sample-entry bytes an iPhone sends this CFMOTO head unit, from
+    /// `carjack/logs/cfmoto-iphone.pcapng`. Ours has to agree with it everywhere the value is not
+    /// stream-specific - a config frame is the only thing the receiver sets its decoder up from,
+    /// and a session where every other layer looks healthy but nothing appears is what a
+    /// disagreement here costs.
+    #[test]
+    fn config_frame_matches_the_iphone_reference() {
+        let config = AvccConfigExtended {
+            hevc: true,
+            avcc: AvccConfig {
+                nal_size_len: 4,
+                // VPS, SPS then PPS, Annex-B, as an encoder emits them.
+                sps_pps: [
+                    &[0u8, 0, 0, 1, 0x40, 0x01, 0x0c, 0x01][..],
+                    &[0, 0, 0, 1, 0x42, 0x01, 0x01, 0x01][..],
+                    &[0, 0, 0, 1, 0x44, 0x01, 0xc0, 0x76][..],
+                ]
+                .concat(),
+            },
+            video_latency: Duration::ZERO,
+            width: 800,
+            height: 1280,
+            respect_timestamps: true,
+            view: Some(VideoView {
+                origin_x: 0.0,
+                origin_y: 224.0,
+                width: 800.0,
+                height: 1056.0,
+            }),
+        };
+
+        let frame = ScreenFrame::config(&config);
+
+        // `1e 01` on the wire: RespectTimestamps | Encrypted | UseFormatDescription | Bit4 |
+        // NoDisplaySleep, the last two only expressible since the field became 16-bit.
+        assert_eq!(
+            frame.header.small_param[1..],
+            [0x1e, 0x01],
+            "flags must match the iPhone's config frame"
+        );
+
+        // An `hvc1` entry naming HEVC, not the AVC compressor name this used to write.
+        // idSize+cType+resvd+dataRefIndex+version+revision+vendor+quality*2+w+h+res*2+dataSize+frameCount
+        let name_at = 50;
+        assert_eq!(&frame.data[name_at..name_at + 5], b"\x04HEVC");
+
+        // ... and the colour box the phone appends after the codec config.
+        assert!(
+            frame.data.windows(4).any(|w| w == b"colr"),
+            "expected a colr atom"
+        );
+        assert!(frame.data.windows(4).any(|w| w == b"hvcC"));
     }
 }

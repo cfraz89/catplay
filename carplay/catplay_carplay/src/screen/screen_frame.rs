@@ -107,6 +107,19 @@ impl ScreenFrameHeader {
         SCREEN_FRAME_HEADER_LEN
     }
 
+    /// The 16-bit flag field, little-endian across `small_param[1]` and `[2]`.
+    #[inline]
+    pub fn flags(&self) -> ScreenFlag {
+        ScreenFlag::from_bits_truncate(u16::from_le_bytes([self.small_param[1], self.small_param[2]]))
+    }
+
+    #[inline]
+    pub fn set_flags(&mut self, flags: ScreenFlag) {
+        let [lo, hi] = flags.bits().to_le_bytes();
+        self.small_param[1] = lo;
+        self.small_param[2] = hi;
+    }
+
     #[inline]
     pub fn from_bytes(buf: &[u8]) -> Option<ScreenFrameHeader> {
         const PARAMS_OFFSET: usize = 8;
@@ -172,16 +185,21 @@ impl ScreenOpCode {
 }
 
 bitflags! {
-     #[derive(Debug)]
-    pub struct ScreenFlag : u8 {
+    /// Sixteen bits, little-endian across `small_param[1]` and `[2]` - which is why
+    /// `NoDisplaySleep` never fitted while this was a `u8`. An iPhone's config frame reads
+    /// `1e 01` = `0x011e`, i.e. everything below plus `NoDisplaySleep` and bit 4.
+     #[derive(Debug, Clone, Copy)]
+    pub struct ScreenFlag : u16 {
         const ShowHUD = 1 << 0;
         const RespectTimestamps = 1 << 1;
         const Encrypted = 1 << 2;
         const UseFormatDescription = 1 << 3;
+        /// Unnamed, and set by every iPhone config frame captured.
+        const Bit4 = 1 << 4;
         const Suspended = 1 << 5;
         const ClearScreen	 = 1 << 6;
         const InterestingFrame = 1 << 7;
-        // const NoDisplaySleep = 1 << 8;
+        const NoDisplaySleep = 1 << 8;
     }
 }
 

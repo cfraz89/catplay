@@ -214,8 +214,14 @@ pub fn hvcc_write_stsd_atom_from_old_format_with_tags(
     config_atom_tag: [u8; 4],
 ) -> Vec<u8> {
     const IMAGE_DESCRIPTION_BASE_LEN: usize = 86;
+    // BT.709 primaries and matrix with the sRGB transfer, as an iPhone appends to every HEVC
+    // config frame. Absent, a receiver has to guess how to interpret the picture.
+    const COLR_ATOM: [u8; 18] = [
+        0, 0, 0, 18, b'c', b'o', b'l', b'r', b'n', b'c', b'l', b'c', 0, 1, 0, 13, 0, 1,
+    ];
+    let colr: &[u8] = if sample_entry_tag == *b"hvc1" { &COLR_ATOM } else { &[] };
     let child_atom_size = (config_payload.len() + 8) as u32;
-    let id_size = (IMAGE_DESCRIPTION_BASE_LEN + config_payload.len() + 8) as u32;
+    let id_size = (IMAGE_DESCRIPTION_BASE_LEN + config_payload.len() + 8 + colr.len()) as u32;
 
     let mut out = Vec::with_capacity(id_size as usize);
 
@@ -237,9 +243,16 @@ pub fn hvcc_write_stsd_atom_from_old_format_with_tags(
     out.extend_from_slice(&0u32.to_be_bytes()); // dataSize
     out.extend_from_slice(&1u16.to_be_bytes()); // frameCount
 
+    // Pascal string, and it has to name the codec in the entry: an iPhone writes "HEVC" in an
+    // `hvc1` entry. Writing the AVC name there described the stream as something it is not.
     let mut name = [0u8; 32];
-    name[0] = 6;
-    name[1..7].copy_from_slice(b"'1cva'");
+    if sample_entry_tag == *b"hvc1" {
+        name[0] = 4;
+        name[1..5].copy_from_slice(b"HEVC");
+    } else {
+        name[0] = 6;
+        name[1..7].copy_from_slice(b"'1cva'");
+    }
     out.extend_from_slice(&name);
 
     out.extend_from_slice(&24u16.to_be_bytes()); // depth
@@ -249,6 +262,7 @@ pub fn hvcc_write_stsd_atom_from_old_format_with_tags(
     out.extend_from_slice(&child_atom_size.to_be_bytes());
     out.extend_from_slice(&config_atom_tag);
     out.extend_from_slice(config_payload);
+    out.extend_from_slice(colr);
 
     debug_assert_eq!(out.len(), id_size as usize);
     out
