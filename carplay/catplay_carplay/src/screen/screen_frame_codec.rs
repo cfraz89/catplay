@@ -397,7 +397,7 @@ mod tests {
     use crate::{
         clock::MediaClockSession,
         screen::{ScreenFrame, ScreenFrameCodec, ScreenFrameHeader, ScreenOpCode, Value64},
-        video::{AvccConfig, AvccConfigExtended},
+        video::{AvccConfig, AvccConfigExtended, VideoView},
     };
 
     #[test]
@@ -700,6 +700,14 @@ mod tests {
             width: 800,
             height: 480,
             respect_timestamps: false,
+            // The shape a unit with an instrument strip asks for, so the view parameters are
+            // covered by the round trip.
+            view: Some(VideoView {
+                origin_x: 0.0,
+                origin_y: 223.0,
+                width: 800.0,
+                height: 1056.0,
+            }),
         };
 
         let mut encoded = BytesMut::new();

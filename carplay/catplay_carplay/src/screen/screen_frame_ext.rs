@@ -8,6 +8,7 @@ use crate::{
     screen::{ScreenFlag, ScreenFrame, ScreenOpCode, Value64},
     video::{
         AnnexBConverter, AvccConfig, AvccConfigExtended, EncodedVideoFrame, HevcNalType, NalChunk, NalError, NalType,
+        VideoView,
         avcc_config_deserialize, avcc_config_serialize, hvcc_config_deserialize, hvcc_config_serialize,
         hvcc_sample_entry_extract_codec_config, hvcc_write_stsd_atom_from_old_format_with_tags,
     },
@@ -152,6 +153,17 @@ impl ScreenFrame {
             header.small_param[1] |= ScreenFlag::RespectTimestamps.bits();
         }
 
+        // An iPhone fills both pairs with the same rect, so mirror that rather than guessing which
+        // one a receiver reads.
+        if let Some(view) = avcc.view {
+            let origin = Value64::from_f32(view.origin_x, view.origin_y);
+            let size = Value64::from_f32(view.width, view.height);
+            header.params[3] = origin;
+            header.params[4] = size;
+            header.params[5] = origin;
+            header.params[6] = size;
+        }
+
         if avcc.hevc {
             if let Some(hvcc) = hvcc_config_serialize(&avcc.avcc) {
                 header.small_param[1] |= ScreenFlag::UseFormatDescription.bits();
@@ -176,10 +188,14 @@ impl ScreenFrame {
         }
 
         let (width, height) = self.header.params[1].as_f32_floor();
-        /*let (view_origin_x, view_origin_y) = self.header.params[3].as_f32();
-        let (view_origin_x, view_origin_y) = (view_origin_x.floor() as u32, view_origin_y.floor() as u32);
+        let (origin_x, origin_y) = self.header.params[3].as_f32();
         let (view_width, view_height) = self.header.params[4].as_f32();
-        let (view_width, view_height) = (view_width.floor() as u32, view_height.floor() as u32);*/
+        let view = (view_width > 0.0 && view_height > 0.0).then_some(VideoView {
+            origin_x,
+            origin_y,
+            width: view_width,
+            height: view_height,
+        });
 
         let flags = self.flags();
         let (avcc, hevc) = if flags.contains(ScreenFlag::UseFormatDescription) {
@@ -209,6 +225,7 @@ impl ScreenFrame {
             width,
             height,
             respect_timestamps: flags.contains(ScreenFlag::RespectTimestamps),
+            view,
         })
     }
 

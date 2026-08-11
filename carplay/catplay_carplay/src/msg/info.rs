@@ -32,6 +32,8 @@ plist_struct! {
         pub device_id: String,
         pub displays: Vec<Display>,
         #[serde(default)]
+        pub display_panels: Vec<DisplayPanel>,
+        #[serde(default)]
         pub extended_features: Vec<ExtendedFeature>,
         pub features: AirPlayFeature,
         #[serde(default)]
@@ -110,6 +112,30 @@ plist_struct! {
         pub ch: Option<u64>,
         pub input_latency_micros: Option<u64>,
         pub output_latency_micros: Option<u64>
+    }
+}
+
+plist_struct! {
+    pub struct InitialVideoStream {
+        pub uuid: String,
+        /// Where the stream sits on the panel. An accessory that keeps part of the panel for its
+        /// own instruments places the stream below it - the CFMOTO unit sends 224 on an 800x1280
+        /// panel, leaving 800x1056 for CarPlay.
+        pub origin_x_pixels: Option<u32>,
+        pub origin_y_pixels: Option<u32>,
+        pub z_index: Option<i32>,
+    }
+}
+
+plist_struct! {
+    pub struct DisplayPanel {
+        pub uid: Option<String>,
+        pub width_pixels: Option<u32>,
+        pub height_pixels: Option<u32>,
+        #[serde(default)]
+        pub initial_video_streams: Vec<InitialVideoStream>,
+        #[serde(default)]
+        pub properties: Vec<String>,
     }
 }
 
