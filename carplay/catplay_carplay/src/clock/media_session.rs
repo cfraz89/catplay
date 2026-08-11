@@ -3,7 +3,20 @@ use std::time::{Duration, Instant};
 use crate::clock::{Clock, ClockMonotonic, MediaClock, MediaPll, NtpU64, RtcpTimeSyncPacket};
 use log::{debug, trace};
 
+/// Every timestamp that leaves this session - time sync packets and the PTS of a frame or a HID
+/// event alike - is NTP-based: session-elapsed nanoseconds plus this offset. The inner [`Clock`]
+/// is monotonic and session-relative, so the [`MediaClock`] methods are the boundary that adds it
+/// on the way out and removes it on the way in. Mixing the two domains puts a receiver that
+/// honours timestamps 70 years out.
 pub const NTP_UNIX_EPOCH_OFFSET_NS: i128 = 2_208_988_800i128 * 1_000_000_000;
+
+/// The NTP epoch as [`NtpU64::as_nanos`] reports it, which is not `NTP_UNIX_EPOCH_OFFSET_NS`:
+/// `as_nanos` reads the seconds field back through `i32`, so anything past 2038 wraps. Every
+/// absolute timestamp wraps by the same amount, so subtracting this - a difference, which is how
+/// `as_nanos` is used everywhere else - recovers the monotonic domain exactly.
+fn ntp_epoch_nanos() -> i128 {
+    NtpU64::from_monotonic_nanos(NTP_UNIX_EPOCH_OFFSET_NS).as_nanos()
+}
 
 pub struct MediaClockSession<C: Clock> {
     clock: C,
@@ -55,23 +68,25 @@ impl<C: Clock> MediaClock for MediaClockSession<C> {
             return None;
         }
 
-        Some(self.clock.decode_ns(pll.remote_to_local(pts.as_nanos())))
+        let nanos = pll.remote_to_local(pts.as_nanos()) - ntp_epoch_nanos();
+        Some(self.clock.decode_ns(nanos))
     }
 
     fn decode_local(&self, pts: NtpU64) -> Instant {
         // iPhone wants to decode "PTS" of a received HID event
-        self.clock.decode_ns(pts.as_nanos())
+        self.clock.decode_ns(pts.as_nanos() - ntp_epoch_nanos())
     }
 
     fn encode_local(&self, pts: Instant) -> NtpU64 {
         // iPhone wants to encode PTS of a video frame
-        let nanos = self.clock.encode_ns(pts);
+        let nanos = self.clock.encode_ns(pts) + NTP_UNIX_EPOCH_OFFSET_NS;
         NtpU64::from_monotonic_nanos(nanos)
     }
 
     fn encode_remote(&self, pts: Instant) -> Option<NtpU64> {
         // HU wants to encode "PTS" of a HID event in iPhone-local time domain
-        let nanos = self.pll.as_ref()?.local_to_remote(self.clock.encode_ns(pts));
+        let local = self.clock.encode_ns(pts) + NTP_UNIX_EPOCH_OFFSET_NS;
+        let nanos = self.pll.as_ref()?.local_to_remote(local);
         Some(NtpU64::from_monotonic_nanos(nanos))
     }
 
@@ -151,5 +166,43 @@ impl<C: Clock> MediaClockSession<C> {
     /// Check whether clock was initialized by sufficient number of probe responses in burst mode.
     pub fn is_ready(&self) -> bool {
         self.initialized
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::clock::RtcpTimeSyncPacket;
+
+    /// A frame PTS and the time sync a receiver synchronizes against have to be the same clock:
+    /// the receiver schedules the first against the second. This was 70 years apart - `respond`
+    /// carried the NTP epoch offset and `encode_local` did not - and a head unit that honours
+    /// timestamps showed nothing at all while ACKing every frame.
+    #[test]
+    fn frame_pts_and_time_sync_share_a_domain() {
+        let session = MediaClockSession::<ClockMonotonic>::new();
+
+        let sync = session.respond(RtcpTimeSyncPacket::build_request(NtpU64::ZERO));
+        let pts = session.encode_local(Instant::now() + Duration::from_millis(100));
+
+        let skew = (pts.as_nanos() - sync.t3.as_nanos()).abs();
+        assert!(
+            skew < Duration::from_secs(1).as_nanos() as i128,
+            "frame PTS {pts:?} is {skew} ns from the clock the receiver syncs to ({:?})",
+            sync.t3
+        );
+    }
+
+    /// Decoding is the inverse of encoding, so a timestamp we produced survives the round trip
+    /// rather than landing an epoch away.
+    #[test]
+    fn local_timestamps_round_trip() {
+        let session = MediaClockSession::<ClockMonotonic>::new();
+
+        let now = Instant::now();
+        let decoded = session.decode_local(session.encode_local(now));
+
+        assert!(decoded.saturating_duration_since(now) < Duration::from_millis(1));
+        assert!(now.saturating_duration_since(decoded) < Duration::from_millis(1));
     }
 }
