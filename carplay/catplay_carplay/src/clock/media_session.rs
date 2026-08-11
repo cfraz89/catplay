@@ -3,6 +3,16 @@ use std::time::{Duration, Instant};
 use crate::clock::{Clock, ClockMonotonic, MediaClock, MediaPll, NtpU64, RtcpTimeSyncPacket};
 use log::{debug, trace};
 
+/// Time sync packets carry this offset; frame and HID timestamps do not.
+///
+/// The two domains differing by 70 years looks like a bug and is not - it is what a real iPhone
+/// does. Verified against a capture of one streaming to a CarPlay head unit: its `t3` read
+/// `2209933588.87` while the PTS on the screen frames it sent 0.5s later read `944789.37`, exactly
+/// `t3` minus this constant. A receiver learns the offset between the clocks from the sync
+/// exchange - where the epoch cancels - and reads the PTS in the sender's bare monotonic domain.
+///
+/// So do not "fix" [`MediaClock::encode_local`] to add this. Adding it puts every frame 70 years
+/// ahead of where a receiver looks for it.
 pub const NTP_UNIX_EPOCH_OFFSET_NS: i128 = 2_208_988_800i128 * 1_000_000_000;
 
 pub struct MediaClockSession<C: Clock> {
@@ -151,5 +161,31 @@ impl<C: Clock> MediaClockSession<C> {
     /// Check whether clock was initialized by sufficient number of probe responses in burst mode.
     pub fn is_ready(&self) -> bool {
         self.initialized
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::clock::RtcpTimeSyncPacket;
+
+    /// Pins the split documented on [`NTP_UNIX_EPOCH_OFFSET_NS`], measured off a real iPhone: a
+    /// frame PTS sits exactly one epoch offset below the clock the receiver synchronizes to.
+    #[test]
+    fn frame_pts_sits_one_epoch_below_the_time_sync() {
+        let session = MediaClockSession::<ClockMonotonic>::new();
+
+        let sync = session.respond(RtcpTimeSyncPacket::build_request(NtpU64::ZERO));
+        let pts = session.encode_local(Instant::now());
+
+        // Compared through `diff_in_nanos` because `as_nanos` reads the seconds field back through
+        // `i32`: an absolute NTP value wraps, and only a difference cancels it.
+        let expected = NtpU64::from_monotonic_nanos(pts.as_nanos() + NTP_UNIX_EPOCH_OFFSET_NS);
+        let skew = NtpU64::diff_in_nanos(sync.t3, expected);
+        assert!(
+            skew.abs() < Duration::from_secs(1).as_nanos() as i128,
+            "PTS {pts:?} is not one epoch below sync {:?} (off by {skew} ns)",
+            sync.t3
+        );
     }
 }
