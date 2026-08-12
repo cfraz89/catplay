@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use bytes::BytesMut;
+use catplay_plist::{PlistSerializable, plist_struct};
 use log::debug;
 
 use crate::{
@@ -249,6 +250,35 @@ impl ScreenFrame {
         header.opcode = ScreenOpCode::KeepAlive;
         frame
     }
+
+    /// The keep-alive an iPhone actually sends: the sender's own view of the stream, as a binary
+    /// plist body. `params[14]` repeats the body length, as the phone's do.
+    pub fn keep_alive_with_stats(stats: &ScreenSenderStats) -> Self {
+        let Ok(body) = stats.pencode() else {
+            return Self::keep_alive();
+        };
+        let mut frame = ScreenFrame::default();
+        frame.header.opcode = ScreenOpCode::KeepAliveWithBody;
+        frame.header.params[14] = Value64::from_f32(0.0, body.len() as f32);
+        frame.data = body;
+        frame
+    }
+}
+
+// What the sender reports about itself alongside a keep-alive, named and cased as an iPhone names
+// them. Two fields it also sends - `rttAvg` and `txCapacityAvg` - are absent because nothing here
+// measures round-trip time or link capacity, and a zero would read as a perfect link rather than
+// as no answer.
+plist_struct! {
+    pub struct ScreenSenderStats {
+        /// Bytes per second written to the screen socket over the last interval.
+        pub tx_usage_avg: f64,
+        #[serde(rename = "encoderCurrentFPS")]
+        pub encoder_current_fps: u32,
+        pub sent_frames_avg: u32,
+        pub queued_frames_avg: u32,
+        pub loss_avg: f64,
+    }
 }
 
 #[cfg(test)]
@@ -334,5 +364,29 @@ mod reference_tests {
         .expect("and serializes back");
 
         assert_eq!(ours, reference, "hvcC must match the iPhone's byte for byte");
+    }
+
+    /// The phone's keep-alives carry its own view of the stream as a binary plist, with the body
+    /// length repeated in `params[14]`. An empty `KeepAlive` is what this used to send.
+    #[test]
+    fn keep_alive_carries_stats_like_the_iphone() {
+        let stats = ScreenSenderStats {
+            tx_usage_avg: 4096.0,
+            encoder_current_fps: 30,
+            sent_frames_avg: 29,
+            queued_frames_avg: 2,
+            loss_avg: 0.0,
+        };
+
+        let frame = ScreenFrame::keep_alive_with_stats(&stats);
+
+        assert_eq!(frame.header.opcode, ScreenOpCode::KeepAliveWithBody);
+        assert_eq!(frame.header.params[14].as_f32(), (0.0, frame.data.len() as f32));
+        assert!(frame.data.starts_with(b"bplist00"));
+        assert_eq!(ScreenSenderStats::pdecode(&frame.data).unwrap(), stats);
+        assert!(
+            frame.data.windows(17).any(|w| w == b"encoderCurrentFPS"),
+            "keys keep the phone's casing"
+        );
     }
 }
