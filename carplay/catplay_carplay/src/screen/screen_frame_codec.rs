@@ -711,7 +711,7 @@ mod tests {
         };
 
         let mut encoded = BytesMut::new();
-        server.encode(ScreenFrame::config(&config), &mut encoded).unwrap();
+        server.encode(ScreenFrame::config(&config, Instant::now(), &clock), &mut encoded).unwrap();
         let decoded_config_frame = client.decode(&mut encoded).unwrap().unwrap();
         assert_eq!(decoded_config_frame.header.opcode, ScreenOpCode::VideoConfig);
         assert_eq!(decoded_config_frame.config_decode(config.video_latency).unwrap(), config);

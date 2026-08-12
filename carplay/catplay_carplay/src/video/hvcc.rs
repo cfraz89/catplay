@@ -10,6 +10,34 @@ pub struct HvccConfig {
     pub vps_sps_pps: Vec<u8>,
 }
 
+/// The twelve profile_tier_level bytes of an HEVC SPS, laid out exactly as `hvcC` wants them,
+/// with the sub-layer count that follows from the same header byte.
+fn sps_profile_tier_level(sps: &[u8]) -> Option<([u8; 12], u8)> {
+    // NAL header, then sps_video_parameter_set_id / sps_max_sub_layers_minus1 /
+    // sps_temporal_id_nesting_flag, then the block itself.
+    let rbsp = rbsp_unescape(sps, 15);
+    let ptl: [u8; 12] = rbsp.get(3..15)?.try_into().ok()?;
+    Some((ptl, ((rbsp[2] >> 1) & 0x07) + 1))
+}
+
+/// Drop the emulation-prevention bytes an encoder inserts into a NAL payload, up to `limit` bytes.
+fn rbsp_unescape(nal: &[u8], limit: usize) -> Vec<u8> {
+    let mut out = Vec::with_capacity(limit);
+    let mut zeros = 0;
+    for &byte in nal {
+        if out.len() == limit {
+            break;
+        }
+        if zeros >= 2 && byte == 0x03 {
+            zeros = 0;
+            continue;
+        }
+        zeros = if byte == 0 { zeros + 1 } else { 0 };
+        out.push(byte);
+    }
+    out
+}
+
 /// Serialize AnnexB VPS/SPS/PPS (stored in [`AvccConfig::sps_pps`]) to HEVCDecoderConfigurationRecord (`hvcC`).
 pub fn hvcc_config_serialize(avcc: &AvccConfig) -> Option<Vec<u8>> {
     if !(avcc.nal_size_len == 1 || avcc.nal_size_len == 2 || avcc.nal_size_len == 4) {
@@ -82,6 +110,16 @@ pub fn hvcc_config_serialize(avcc: &AvccConfig) -> Option<Vec<u8>> {
         0x04 | ((avcc.nal_size_len - 1) as u8), // temporalIdNested + lengthSizeMinusOne
         0x00,                                   // numOfArrays (filled below)
     ];
+
+    // A receiver sets its decoder up from this record rather than from the parameter sets, so the
+    // profile/tier/level has to be the stream's own - the skeleton above describes a stream at no
+    // level and compatible with no profile, which is a decoder that never starts.
+    if let Some((ptl, sub_layers)) = sps_profile_tier_level(&sps_list[0]) {
+        out[1..13].copy_from_slice(&ptl);
+        // constantFrameRate=0, then the sub-layer count. An iPhone leaves temporalIdNested clear
+        // here even when its SPS sets the flag.
+        out[21] = (sub_layers & 0x07) << 3 | ((avcc.nal_size_len - 1) as u8);
+    }
 
     let mut num_arrays = 0u8;
     let mut append_array = |nal_type: u8, nals: &[Vec<u8>]| {
@@ -230,12 +268,14 @@ pub fn hvcc_write_stsd_atom_from_old_format_with_tags(
     out.extend_from_slice(&sample_entry_tag); // cType ('avc1'/'hvc1')
     out.extend_from_slice(&0u32.to_be_bytes()); // resvd1
     out.extend_from_slice(&0u16.to_be_bytes()); // resvd2
-    out.extend_from_slice(&0x00FFu16.to_be_bytes()); // dataRefIndex
+    // dataRefIndex and the two quality fields carry what an iPhone puts there; nothing in the
+    // stream depends on them, and a receiver that checks them has one less reason to say no.
+    out.extend_from_slice(&0xFFFFu16.to_be_bytes()); // dataRefIndex
     out.extend_from_slice(&0u16.to_be_bytes()); // version
     out.extend_from_slice(&0u16.to_be_bytes()); // revisionLevel
     out.extend_from_slice(&0u32.to_be_bytes()); // vendor
-    out.extend_from_slice(&0u32.to_be_bytes()); // temporalQuality
-    out.extend_from_slice(&0u32.to_be_bytes()); // spatialQuality
+    out.extend_from_slice(&0x0000_0200u32.to_be_bytes()); // temporalQuality
+    out.extend_from_slice(&0x0000_0200u32.to_be_bytes()); // spatialQuality
     out.extend_from_slice(&(width as u16).to_be_bytes()); // width
     out.extend_from_slice(&(height as u16).to_be_bytes()); // height
     out.extend_from_slice(&0x0048_0000u32.to_be_bytes()); // hRes (72 dpi)

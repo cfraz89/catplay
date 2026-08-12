@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::{
     rtsp_frame::RtspError,
-    video::{AvccConfigExtended, EncodedVideoFrame},
+    video::{AvccConfigExtended, EncodedVideoFrame, Pts},
 };
 
 #[derive(Clone, Debug, thiserror::Error)]
@@ -41,7 +41,7 @@ pub trait ScreenTransmitSink: Send + 'static {
     /// Set first or updated AVCC stream config.
     ///
     /// This will always need to happen before first frame.
-    fn push_avcc_config(&mut self, _config: AvccConfigExtended) -> Result<(), ScreenTransmitError>;
+    fn push_avcc_config(&mut self, _config: AvccConfigExtended, _pts: Pts) -> Result<(), ScreenTransmitError>;
 
     /// Adds a frame to transmit buffer and wakes up TCP transmit task.
     ///

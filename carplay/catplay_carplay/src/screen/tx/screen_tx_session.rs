@@ -14,11 +14,11 @@ use crate::{
     clock::MediaClockBox,
     rtsp_frame::{RtspError, RtspResult},
     screen::{ScreenFrame, ScreenFrameCodec, tx::screen_tx_proxy::ScreenTransmitProxy},
-    video::{AvccConfigExtended, EncodedVideoFrame},
+    video::{AvccConfigExtended, EncodedVideoFrame, Pts},
 };
 
 pub enum ScreenTransmitOp {
-    Configure(AvccConfigExtended),
+    Configure(AvccConfigExtended, Pts),
     Frame(EncodedVideoFrame),
     TransmitterDropped,
 }
@@ -33,7 +33,7 @@ impl ScreenTransmitOp {
     }
 
     pub fn is_configure(&self) -> bool {
-        matches!(self, ScreenTransmitOp::Configure(_))
+        matches!(self, ScreenTransmitOp::Configure(..))
     }
 }
 
@@ -49,6 +49,9 @@ pub struct ScreenTransmitSession {
 
     pending_ops: Arc<Mutex<VecDeque<ScreenTransmitOp>>>,
     nal_size_len: usize,
+    /// Set by a config frame, cleared by the video frame that follows it - see
+    /// [`ScreenFrame::mark_opening_frame`].
+    opening_frame: bool,
 
     notify_frame_added: Notify,
     notify_frame_consumed: Notify,
@@ -90,6 +93,7 @@ impl ScreenTransmitSession {
             keep_alive_interval,
             last_keepalive: Instant::now(),
             nal_size_len: 4,
+            opening_frame: false,
 
             pending_ops,
             notify_frame_added,
@@ -126,15 +130,19 @@ impl TcpSession for ScreenTransmitSession {
 
         while let Some(elem) = ops.pop_front() {
             match elem {
-                ScreenTransmitOp::Configure(config) => {
+                ScreenTransmitOp::Configure(config, pts) => {
                     debug!("Writing AVCC config now");
                     self.nal_size_len = config.avcc.nal_size_len;
-                    sink.write(ScreenFrame::config(&config))?;
+                    self.opening_frame = true;
+                    sink.write(ScreenFrame::config(&config, pts.0, self.clock.as_ref()))?;
                 }
                 ScreenTransmitOp::Frame(frame) => {
                     warn!("Flushing video frame pts={:?} keyframe={}", frame.pts, frame.is_known_keyframe());
-                    let screen_frame = ScreenFrame::video_proxied(frame, self.nal_size_len, self.clock.as_ref())
+                    let mut screen_frame = ScreenFrame::video_proxied(frame, self.nal_size_len, self.clock.as_ref())
                         .map_err(|e| RtspError::UnexpectedState(format!("unexpected failure during NAL serialization: {e:?}")))?;
+                    if std::mem::take(&mut self.opening_frame) {
+                        screen_frame.mark_opening_frame();
+                    }
                     sink.write_composite(screen_frame)?;
                     self.notify_frame_consumed.notify();
                 }

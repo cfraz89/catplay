@@ -1,6 +1,6 @@
 use std::{
     net::{Ipv4Addr, SocketAddrV4},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use async_trait::async_trait;
@@ -190,11 +190,12 @@ async fn setups_video_audio_streams() {
         width: 1920,
         height: 1080,
         respect_timestamps: true,
+        view: None,
     };
 
     let mut _transmitter = AirPlayTransmitterImpl::connect(bootstrap).await.unwrap();
     let mut sink = _transmitter.do_setup_video(StreamType::Screen, Duration::from_millis(75)).await.unwrap();
-    sink.push_avcc_config(config).unwrap();
+    sink.push_avcc_config(config, Instant::now().into()).unwrap();
 
     let _ = _transmitter
         .do_setup_audio(

@@ -12,7 +12,7 @@ use crate::{
         screen_tx_session::ScreenTransmitOp,
         screen_tx_sink::{ScreenTransmitError, ScreenTransmitSink},
     },
-    video::{AvccConfigExtended, EncodedVideoFrame},
+    video::{AvccConfigExtended, EncodedVideoFrame, Pts},
 };
 pub struct ScreenTransmitProxy {
     stream_latency: Duration,
@@ -71,7 +71,7 @@ impl ScreenTransmitSink for ScreenTransmitProxy {
         *self.closed.lock().unwrap()
     }
 
-    fn push_avcc_config(&mut self, config: AvccConfigExtended) -> Result<(), ScreenTransmitError> {
+    fn push_avcc_config(&mut self, config: AvccConfigExtended, pts: Pts) -> Result<(), ScreenTransmitError> {
         let closed = self.closed.lock().unwrap();
         if *closed {
             return Err(ScreenTransmitError::Closed);
@@ -84,7 +84,7 @@ impl ScreenTransmitSink for ScreenTransmitProxy {
         }
 
         let mut ops = self.queue.lock().unwrap();
-        ops.push_back(ScreenTransmitOp::Configure(config.clone()));
+        ops.push_back(ScreenTransmitOp::Configure(config.clone(), pts));
         self.last_config.replace(config);
         self.notify_frame_added.notify();
 
@@ -101,7 +101,7 @@ impl ScreenTransmitSink for ScreenTransmitProxy {
         }
 
         if let Some(config) = frame.config.clone()
-            && let Err(err) = self.push_avcc_config(config)
+            && let Err(err) = self.push_avcc_config(config, frame.pts)
         {
             return Err((err, frame));
         }

@@ -142,10 +142,13 @@ impl ScreenFrame {
         }))
     }
 
-    pub fn config(avcc: &AvccConfigExtended) -> Self {
+    /// `pts` is the timestamp of the frame this configures the decoder for - an iPhone stamps the
+    /// config frame with it rather than leaving the media clock at zero.
+    pub fn config(avcc: &AvccConfigExtended, pts: Instant, clock: &dyn MediaClock) -> Self {
         let mut frame = ScreenFrame::default();
         let header = &mut frame.header;
         header.opcode = ScreenOpCode::VideoConfig;
+        header.params[0] = Value64::from_u64(clock.encode_local(pts).0);
         header.params[1] = Value64::from_f32_floor(avcc.width, avcc.height);
 
         // What an iPhone sets, less the ones that depend on the caller. `Bit4` and `NoDisplaySleep`
@@ -181,6 +184,12 @@ impl ScreenFrame {
 
         frame.header.set_flags(flags);
         frame
+    }
+
+    /// Mark the frame that opens the stream. An iPhone sets this on the video frame following a
+    /// config frame and on no other, so a receiver may well be waiting for it before it decodes.
+    pub fn mark_opening_frame(&mut self) {
+        self.header.small_param[0] = 0x10;
     }
 
     pub fn flags(&self) -> ScreenFlag {
@@ -245,7 +254,8 @@ impl ScreenFrame {
 #[cfg(test)]
 mod reference_tests {
     use super::*;
-    use crate::video::{AvccConfig, VideoView};
+    use crate::clock::MediaClockSession;
+    use crate::video::{AvccConfig, VideoView, hvcc_config_serialize};
 
     /// The header and sample-entry bytes an iPhone sends this CFMOTO head unit, from
     /// `carjack/logs/cfmoto-iphone.pcapng`. Ours has to agree with it everywhere the value is not
@@ -278,7 +288,7 @@ mod reference_tests {
             }),
         };
 
-        let frame = ScreenFrame::config(&config);
+        let frame = ScreenFrame::config(&config, Instant::now(), &MediaClockSession::new());
 
         // `1e 01` on the wire: RespectTimestamps | Encrypted | UseFormatDescription | Bit4 |
         // NoDisplaySleep, the last two only expressible since the field became 16-bit.
@@ -299,5 +309,30 @@ mod reference_tests {
             "expected a colr atom"
         );
         assert!(frame.data.windows(4).any(|w| w == b"hvcC"));
+    }
+
+    /// The `hvcC` from the same capture. A receiver sets its decoder up from this record and
+    /// nothing else, so round-tripping the phone's own parameter sets through our writer has to
+    /// reproduce it exactly - profile, tier and level included, which the skeleton left at zero.
+    #[test]
+    fn hvcc_round_trips_the_iphone_reference() {
+        const REFERENCE: &str = "010160000000b0000000000078f000fcfdf8f800000b03a00001001840010c01ffff0160000\
+            00300b000000300000300780cc090a10001003e420101016000000300b00000030000030078a0064200501620\
+            33b914862e7f13f0bfa1bf50ffaa08fd5413faaa0afd55417faaaa0cfd5554a6e021a02010a2000100074401c\
+            072f05b24";
+        let reference: Vec<u8> = REFERENCE
+            .as_bytes()
+            .chunks(2)
+            .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
+            .collect();
+
+        let parsed = hvcc_config_deserialize(&reference).expect("the phone's record parses");
+        let ours = hvcc_config_serialize(&AvccConfig {
+            nal_size_len: parsed.nal_size_len,
+            sps_pps: parsed.vps_sps_pps,
+        })
+        .expect("and serializes back");
+
+        assert_eq!(ours, reference, "hvcC must match the iPhone's byte for byte");
     }
 }

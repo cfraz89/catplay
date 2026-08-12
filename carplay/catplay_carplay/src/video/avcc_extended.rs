@@ -10,9 +10,8 @@ pub struct AvccConfigExtended {
     pub width: u32,
     pub height: u32,
     pub respect_timestamps: bool,
-    /// Where the decoded video belongs on the panel, when it is not the whole of it. An iPhone
-    /// sends origin `(0, 223)` and size `(800, 1056)` to a unit whose panel is 800x1280 with a
-    /// 224px instrument strip; left `None` the view parameters go out zeroed, as before.
+    /// Where the decoded video belongs on the panel, when it is not the whole of it. Left `None`,
+    /// the view parameters go out zeroed.
     pub view: Option<VideoView>,
 }
 
