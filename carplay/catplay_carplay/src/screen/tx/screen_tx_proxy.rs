@@ -77,12 +77,11 @@ impl ScreenTransmitSink for ScreenTransmitProxy {
             return Err(ScreenTransmitError::Closed);
         }
 
-        if let Some(last_config) = self.last_config.as_ref()
-            && last_config == &config
-        {
-            return Ok(());
-        }
-
+        // Deliberately not deduplicated against the last config. A config frame accompanies
+        // exactly the frames the sender attaches one to - its keyframes - and it is what tells a
+        // receiver that a decoder can start here: sent once, every later keyframe is
+        // indistinguishable from a delta frame on the wire, and a receiver that has lost its
+        // decoder asks for a keyframe it cannot recognise when it arrives.
         let mut ops = self.queue.lock().unwrap();
         ops.push_back(ScreenTransmitOp::Configure(config.clone(), pts));
         self.last_config.replace(config);
@@ -146,5 +145,50 @@ impl Drop for ScreenTransmitProxy {
         debug!("Screen transmitter was dropped!");
         // self.queue.lock().unwrap().push_back(ScreenTransmitOp::TransmitterDropped);
         self.notify_frame_added.notify();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Instant;
+
+    use super::*;
+    use crate::video::AvccConfig;
+
+    fn config() -> AvccConfigExtended {
+        AvccConfigExtended {
+            hevc: true,
+            avcc: AvccConfig {
+                nal_size_len: 4,
+                sps_pps: vec![0, 0, 0, 1, 0x40, 0x01],
+            },
+            video_latency: Duration::ZERO,
+            width: 800,
+            height: 1280,
+            respect_timestamps: true,
+            view: None,
+        }
+    }
+
+    /// Every keyframe carries its config to the wire, unchanged config or not: it is what marks a
+    /// point the receiver's decoder can start from.
+    #[test]
+    fn an_unchanged_config_still_goes_out_again() {
+        let queue = Arc::new(Mutex::new(VecDeque::new()));
+        let mut proxy = ScreenTransmitProxy::new(
+            Duration::ZERO,
+            queue.clone(),
+            Arc::new(Mutex::new(false)),
+            Notify::new(),
+            Notify::new(),
+            8,
+        );
+
+        let pts = Pts(Instant::now());
+        proxy.push_avcc_config(config(), pts).unwrap();
+        proxy.push_avcc_config(config(), pts).unwrap();
+
+        let queued = queue.lock().unwrap().iter().filter(|op| op.is_configure()).count();
+        assert_eq!(queued, 2);
     }
 }

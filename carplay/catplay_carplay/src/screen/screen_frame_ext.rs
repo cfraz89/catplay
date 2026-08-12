@@ -187,7 +187,7 @@ impl ScreenFrame {
         frame
     }
 
-    /// Mark the frame that opens the stream. An iPhone sets this on the video frame following a
+    /// Mark a frame the stream can open on. An iPhone sets this on the video frame following a
     /// config frame and on no other, so a receiver may well be waiting for it before it decodes.
     pub fn mark_opening_frame(&mut self) {
         self.header.small_param[0] = 0x10;
