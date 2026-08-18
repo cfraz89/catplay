@@ -50,6 +50,7 @@ pub struct ProdGadget {
     pending_transmitter: Arc<TokioMutex<Option<TeardownGuard<AirPlayTransmitterImpl>>>>,
 
     last_tx: Arc<Mutex<Option<ProdGadgetSession>>>,
+    burst_wakeups: bool,
 }
 
 #[derive(Clone, PartialEq, Debug, thiserror::Error)]
@@ -108,6 +109,7 @@ impl ProdGadget {
                 tx: None,
                 pending_transmitter: Default::default(),
                 last_tx: Default::default(),
+                burst_wakeups: false,
             },
             Ok(ProdGadgetState::Initial),
         )
@@ -138,7 +140,13 @@ pub struct ProdGadgetSession {
 impl EventSleeper for ProdGadget {
     async fn sleep(&mut self) -> Option<EventToken> {
         let mut pending_transmitter = self.pending_transmitter.lock().await;
-        event_select!(pending_transmitter.as_mut(), self.tx, self.rx_usb, self.rx, deadline_after(Duration::from_millis(50)))
+        let fallback = if self.burst_wakeups {
+            Duration::from_millis(50)
+        } else {
+            Duration::from_millis(500)
+        };
+
+        event_select!(pending_transmitter.as_mut(), self.tx, self.rx_usb, self.rx, deadline_after(fallback))
     }
 }
 
@@ -158,6 +166,15 @@ impl Reconcilable for ProdGadget {
                 rx.child_mut().set_invites_blocked(true)
             };
         }
+
+        self.burst_wakeups = new.is_err()
+            || matches!(
+                new,
+                Ok(ProdGadgetState::Initial)
+                    | Ok(ProdGadgetState::WaitingForUdc)
+                    | Ok(ProdGadgetState::WaitingForUsbTransmitterGadget)
+                    | Ok(ProdGadgetState::WaitingForWirelessCarPlayGadget)
+            );
 
         new
     }
