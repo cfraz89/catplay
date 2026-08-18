@@ -51,6 +51,8 @@ pub struct CarPlayWirelessGadget<T: AirPlayReceiverSink> {
     // BT "last-connect" cache file
     bt_last_connect_cache_file: Option<String>,
     bt_last_connect_cache_loaded: bool,
+
+    burst_wakeups: bool,
 }
 
 impl<T: AirPlayReceiverSink> CarPlayWirelessGadget<T> {
@@ -93,6 +95,7 @@ impl<T: AirPlayReceiverSink> CarPlayWirelessGadget<T> {
                 last_mac: None,
                 bt_last_connect_cache_file: bt_last_connect_cache_file.map(|p| p.into()),
                 bt_last_connect_cache_loaded: false,
+                burst_wakeups: false,
             },
             Ok(LocalState::Initial),
         )
@@ -236,7 +239,14 @@ impl<T: AirPlayReceiverSink> AsyncShutdown for CarPlayWirelessGadget<T> {
 
 impl<T: AirPlayReceiverSink> EventSleeper for CarPlayWirelessGadget<T> {
     async fn sleep(&mut self) -> Option<catplay_util::EventToken> {
-        event_select!(deadline_after(Duration::from_millis(50)))
+        event_select!(deadline_after(if self.burst_wakeups {
+            Duration::from_millis(50)
+        } else {
+            // AirPlay does not provide a callback when a session is released,
+            // so we periodically check find_active_session(). This fallback
+            // exists primarily to detect that session release.
+            Duration::from_millis(500)
+        }))
     }
 }
 
@@ -257,6 +267,12 @@ impl<T: AirPlayReceiverSink> Reconcilable for CarPlayWirelessGadget<T> {
             self.bluetooth.take();
             self.last_mac.take();
         }
+
+        self.burst_wakeups = match new {
+            Err(_) => true,
+            Ok(LocalState::Inviting | LocalState::Receiving | LocalState::Passive) => false,
+            Ok(_) => true,
+        };
 
         new
     }
