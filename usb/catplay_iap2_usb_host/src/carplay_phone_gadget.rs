@@ -122,6 +122,7 @@ pub struct CarPlayPhoneGadget {
     accessory_iap2: Option<AsyncClientStream<IAP2Fd>>,
 
     csm: CsmSessionCallback,
+    burst_wakeups: bool,
 }
 
 impl CarPlayPhoneGadget {
@@ -151,6 +152,7 @@ impl CarPlayPhoneGadget {
 
             accessory_iap2: None,
             csm,
+            burst_wakeups: false,
         };
         Ok(Reconciler::new(me, Ok(CarPlayPhoneGadgetStatus::Initial)))
     }
@@ -217,7 +219,11 @@ impl CarPlayPhoneGadget {
 
 impl EventSleeper for CarPlayPhoneGadget {
     async fn sleep(&mut self) -> Option<catplay_util::EventToken> {
-        event_select!(self.gadget, self.accessory_iap2, deadline_after(Duration::from_millis(20)))
+        event_select!(
+            self.gadget,
+            self.accessory_iap2,
+            deadline_after(if self.burst_wakeups { Duration::from_millis(20) } else { Duration::MAX })
+        )
     }
 }
 
@@ -235,6 +241,13 @@ impl Reconcilable for CarPlayPhoneGadget {
             self.stop_gadget().await?;
             self.accessory = None;
         }
+
+        self.burst_wakeups = new.is_err()
+            || matches!(
+                new,
+                Ok(CarPlayPhoneGadgetStatus::WaitingForStableMulticast)
+                    | Ok(CarPlayPhoneGadgetStatus::WaitingForAccessory { .. })
+            );
 
         new
     }
