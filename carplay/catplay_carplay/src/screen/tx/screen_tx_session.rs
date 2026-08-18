@@ -6,7 +6,7 @@ use std::{
 
 use async_trait::async_trait;
 use catplay_tokio::{CItem, TcpSession, TcpSink};
-use catplay_util::{AsyncShutdown, EventSleeper, EventToken, deadline, event_select, notify::Notify};
+use catplay_util::{AsyncShutdown, EventSleeper, EventToken, deadline_after, event_select, notify::Notify};
 use log::{debug, warn};
 
 use crate::{
@@ -168,7 +168,13 @@ impl TcpSession for ScreenTransmitSession {
 
 impl EventSleeper for ScreenTransmitSession {
     async fn sleep(&mut self) -> Option<EventToken> {
-        event_select!(self.notify_frame_added, deadline(Instant::now() + Duration::from_millis(100)))
+        let keep_alive_deadline = if self.keep_alive_interval.is_zero() {
+            Duration::MAX
+        } else {
+            (self.last_keepalive + self.keep_alive_interval).saturating_duration_since(Instant::now())
+        };
+
+        event_select!(self.notify_frame_added, deadline_after(keep_alive_deadline))
     }
 }
 
