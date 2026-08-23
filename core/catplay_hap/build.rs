@@ -185,17 +185,64 @@ fn main() {
     println!("cargo:rerun-if-changed=asm/mips_arch.h");
 }
 
+// Stand-in for BoringSSL's <openssl/asm_base.h>, which the vendored chacha20_poly1305 .S files
+// include. Only the pieces those files actually use: `_CET_ENDBR` on x86_64, and the aarch64
+// link-register macros. The aarch64 block mirrors BoringSSL's own definitions (PAC/BTI hints when
+// the compiler asks for them, empty otherwise); it does not emit the .note.gnu.property marker, so
+// objects built with -mbranch-protection just aren't marked as BTI/PAC-enabled.
+const OPENSSL_ASM_BASE_H: &str = r#"#ifndef OPENSSL_HEADER_ASM_BASE_H
+#define OPENSSL_HEADER_ASM_BASE_H
+
+#define _CET_ENDBR
+
+#if defined(__ASSEMBLER__) && defined(OPENSSL_AARCH64)
+
+#if defined(__ARM_FEATURE_BTI_DEFAULT) && __ARM_FEATURE_BTI_DEFAULT == 1
+.macro AARCH64_VALID_CALL_TARGET
+  hint #34 // bti c
+.endm
+#else
+.macro AARCH64_VALID_CALL_TARGET
+.endm
+#endif
+
+#if defined(__ARM_FEATURE_PAC_DEFAULT)
+#if ((__ARM_FEATURE_PAC_DEFAULT & 1) == 1) // signed with A-key
+.macro AARCH64_SIGN_LINK_REGISTER
+  hint #25 // paciasp
+.endm
+.macro AARCH64_VALIDATE_LINK_REGISTER
+  hint #29 // autiasp
+.endm
+#elif ((__ARM_FEATURE_PAC_DEFAULT & 2) == 2) // signed with B-key
+.macro AARCH64_SIGN_LINK_REGISTER
+  hint #27 // pacibsp
+.endm
+.macro AARCH64_VALIDATE_LINK_REGISTER
+  hint #31 // autibsp
+.endm
+#else
+#error Pointer authentication must be signed with either A or B key
+#endif
+#else
+// No pointer authentication: signing is a no-op, but the entry point still has to be a valid
+// indirect call target under BTI.
+.macro AARCH64_SIGN_LINK_REGISTER
+  AARCH64_VALID_CALL_TARGET
+.endm
+.macro AARCH64_VALIDATE_LINK_REGISTER
+.endm
+#endif
+
+#endif // __ASSEMBLER__ && OPENSSL_AARCH64
+
+#endif
+"#;
+
 fn write_openssl_asm_base_header(out_dir: &Path) {
     let include_dir = out_dir.join("openssl");
     fs::create_dir_all(&include_dir).expect("failed to create OUT_DIR/openssl");
-    fs::write(
-        include_dir.join("asm_base.h"),
-        "#ifndef OPENSSL_HEADER_ASM_BASE_H\n\
-         #define OPENSSL_HEADER_ASM_BASE_H\n\
-         #define _CET_ENDBR\n\
-         #endif\n",
-    )
-    .expect("failed to write OUT_DIR/openssl/asm_base.h");
+    fs::write(include_dir.join("asm_base.h"), OPENSSL_ASM_BASE_H).expect("failed to write OUT_DIR/openssl/asm_base.h");
 }
 
 fn prepare_poly1305_asm_sources(build: &mut cc::Build, out_dir: &Path, arch: &str, os: &str, features: &str) -> Vec<PathBuf> {
