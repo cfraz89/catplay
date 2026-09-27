@@ -123,7 +123,10 @@ impl<T: RtspReceiverCallback> TcpSession for RtspReceiver<T> {
 
     fn init_stream(&mut self, stream: &mut TcpStream) -> Result<(), Self::Error> {
         stream.set_nodelay(true)?;
+        #[cfg(target_os = "linux")]
         std::os::linux::net::TcpStreamExt::set_quickack(stream, true)?;
+        #[cfg(target_os = "android")]
+        std::os::android::net::TcpStreamExt::set_quickack(stream, true)?;
 
         Ok(())
     }

@@ -471,7 +471,11 @@ impl RawMdnsBackend {
         }
         let fd = unsafe { OwnedFd::from_raw_fd(fd) };
 
-        let groups = (libc::RTMGRP_IPV4_IFADDR | libc::RTMGRP_IPV6_IFADDR | libc::RTMGRP_LINK) as u32;
+        // From linux/rtnetlink.h; the libc crate's Android bindings leave them out.
+        const RTMGRP_LINK: u32 = 0x1;
+        const RTMGRP_IPV4_IFADDR: u32 = 0x10;
+        const RTMGRP_IPV6_IFADDR: u32 = 0x100;
+        let groups = RTMGRP_IPV4_IFADDR | RTMGRP_IPV6_IFADDR | RTMGRP_LINK;
         let mut addr: libc::sockaddr_nl = unsafe { std::mem::zeroed() };
         addr.nl_family = libc::AF_NETLINK as u16;
         addr.nl_pid = 0;

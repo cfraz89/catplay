@@ -205,11 +205,12 @@ fn page_size() -> Option<usize> {
 
 #[cfg(unix)]
 fn create_backing_fd() -> Option<libc::c_int> {
+    #[cfg(not(target_os = "android"))]
     if let Some(fd) = shm_open_unique() {
         return Some(fd);
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     if let Some(fd) = memfd_create_unique() {
         return Some(fd);
     }
@@ -217,7 +218,8 @@ fn create_backing_fd() -> Option<libc::c_int> {
     None
 }
 
-#[cfg(unix)]
+// Bionic has no shm_open.
+#[cfg(all(unix, not(target_os = "android")))]
 fn shm_open_unique() -> Option<libc::c_int> {
     use std::ffi::CString;
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
@@ -244,7 +246,7 @@ fn shm_open_unique() -> Option<libc::c_int> {
     None
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn memfd_create_unique() -> Option<libc::c_int> {
     use std::ffi::CString;
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};

@@ -151,7 +151,7 @@ impl MdnsAnnouncer {
     }
 
     fn set_reuse_port(fd: std::os::fd::RawFd) -> io::Result<()> {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         {
             let ret = unsafe {
                 libc::setsockopt(
@@ -171,7 +171,7 @@ impl MdnsAnnouncer {
     }
 
     fn bind_to_device(fd: std::os::fd::RawFd, iface: &str) -> io::Result<()> {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "android"))]
         {
             let iface_c = CString::new(iface)?;
             let ret = unsafe {

@@ -697,6 +697,12 @@ fn errno() -> i32 {
     unsafe { *libc::__errno_location() }
 }
 
+#[cfg(target_os = "android")]
+#[inline]
+fn errno() -> i32 {
+    unsafe { *libc::__errno() }
+}
+
 #[cfg(test)]
 mod tests {
     use catplay_tracing::logger::setup_test_logger;
